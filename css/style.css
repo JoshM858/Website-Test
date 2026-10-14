@@ -134,36 +134,113 @@ img,svg{display:block; max-width:100%;}
 .nav-cta span{transition:transform 0.25s var(--ease);}
 .nav-cta:hover span{transform:translateX(3px);}
 
-/* ============ hero ============ */
+/* ============ hero (dark, video) ============ */
 .hero{
-  max-width:var(--maxw);
-  margin:0 auto;
-  padding:96px 32px 40px;
-  display:grid;
-  grid-template-columns:1.05fr 0.95fr;
-  gap:56px;
-  align-items:center;
+  position:relative;
+  height:100vh; height:100svh; min-height:560px;
+  overflow:hidden;
+  color:var(--cream);
+  /* Fallback shown until (or if) the video loads */
+  background:
+    radial-gradient(1100px 640px at 78% 18%, rgba(193,81,42,0.38), transparent 62%),
+    radial-gradient(900px 560px at 8% 92%, rgba(124,138,92,0.2), transparent 60%),
+    var(--ink);
 }
-.hero-title{
-  font-size:clamp(2.6rem, 5.4vw, 4.4rem);
-  line-height:1.04;
+.hero-video{
+  position:absolute; inset:0; width:100%; height:100%;
+  object-fit:cover;
+  opacity:0; transition:opacity 1.2s ease;
 }
-.hero-title .line{display:block;}
+.hero-video.is-ready{opacity:1;}
+.hero-noise{
+  position:absolute; inset:0; pointer-events:none;
+  opacity:0.55; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  background-size:200px 200px;
+}
+/* Ends on solid ink so the hero melts into the (also dark) quiz deck below. */
+.hero-shade{
+  position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(180deg, rgba(33,29,23,0.35) 0%, rgba(33,29,23,0) 34%, rgba(33,29,23,0.5) 72%, var(--ink) 100%);
+}
+
+/* Fixed pill nav: ink on top of the hero, still readable on cream further down. */
+.hero-nav{
+  position:fixed; top:0; left:50%; transform:translateX(-50%);
+  z-index:100;
+  display:flex; align-items:center; gap:clamp(12px, 2.8vw, 48px);
+  padding:10px clamp(14px, 3vw, 34px);
+  background:rgba(33,29,23,0.92);
+  backdrop-filter:blur(10px);
+  border-radius:0 0 22px 22px;
+  box-shadow:0 10px 30px -12px rgba(33,29,23,0.5);
+}
+.hero-nav a{
+  font-size:clamp(0.66rem, 1.15vw, 0.9rem);
+  font-weight:500;
+  white-space:nowrap;
+  color:rgba(246,241,231,0.8);
+  transition:color 0.25s var(--ease);
+}
+.hero-nav a:hover{color:var(--cream);}
+.hero-nav a:focus-visible{color:var(--cream); outline:2px solid var(--cream); outline-offset:4px; border-radius:4px;}
+.hero-nav .hero-nav-cta{color:var(--accent-tint);}
+
+.hero-content{
+  position:absolute; left:0; right:0; bottom:0;
+  padding:0 clamp(16px, 4vw, 40px) 8px;
+  display:grid; grid-template-columns:repeat(12, 1fr); gap:16px; align-items:end;
+}
+.hero-word{
+  grid-column:1 / -1;
+  margin:0;
+  font-family:'Fraunces', Georgia, serif;
+  font-weight:500;
+  color:var(--cream);
+  line-height:0.85;
+  letter-spacing:-0.055em;
+  font-size:26vw;
+}
+.hero-word .w{display:inline-block; position:relative;}
+.hero-word .ast{position:absolute; top:0.12em; right:-0.17em; font-family:'Inter', sans-serif; font-weight:600; font-size:0.3em; letter-spacing:0; line-height:1; color:var(--accent);}
+.hero-side{
+  grid-column:1 / -1;
+  display:flex; flex-direction:column; align-items:flex-start; gap:18px;
+  padding-bottom:24px;
+}
+.hero-eyebrow{
+  font-size:0.72rem; font-weight:600; letter-spacing:0.12em; text-transform:uppercase;
+  color:var(--accent-tint);
+}
 .hero-sub{
-  display:block;
-  margin-top:26px;
-  font-size:1.12rem;
-  line-height:1.6;
-  color:var(--ink-soft);
+  font-size:clamp(0.8rem, 1.1vw, 1rem);
+  line-height:1.4;
+  color:rgba(246,241,231,0.78);
   max-width:46ch;
 }
-.hero-actions{
-  margin-top:36px;
-  display:flex; flex-direction:column; align-items:flex-start; gap:12px;
+.hero-cta{
+  display:inline-flex; align-items:center; gap:10px;
+  padding:4px 4px 4px 22px;
+  border-radius:999px;
+  background:var(--cream); color:var(--ink);
+  font-weight:600; font-size:0.98rem;
+  transition:gap 0.35s var(--ease);
 }
-.hero-note{
-  font-size:0.85rem;
-  color:var(--ink-faint);
+.hero-cta:hover{gap:16px;}
+.hero-cta:focus-visible{outline:2px solid var(--cream); outline-offset:4px;}
+.hero-cta-icon{
+  width:40px; height:40px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--accent-dim); color:var(--cream);
+  transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+.hero-cta:hover .hero-cta-icon{transform:scale(1.12);}
+
+@media (min-width: 640px){ .hero-word{font-size:24vw;} }
+@media (min-width: 768px){ .hero-word{font-size:22vw;} }
+@media (min-width: 1024px){
+  .hero-word{grid-column:span 8; font-size:20vw;}
+  .hero-side{grid-column:span 4; padding-bottom:40px;}
 }
 
 .btn{
@@ -183,26 +260,7 @@ img,svg{display:block; max-width:100%;}
    sign-up action exists), so no interactive affordance is implied. */
 .btn-large{padding:18px 34px; font-size:1.05rem;}
 
-/* ============ hero device mockup ============ */
-.hero-visual{display:flex; justify-content:center;}
-.device{
-  width:100%;
-  max-width:390px;
-  background:var(--ink);
-  border-radius:26px;
-  padding:8px;
-  box-shadow:0 30px 60px -20px rgba(33,29,23,0.35), 0 10px 24px -10px rgba(33,29,23,0.25);
-}
-.device-bar{
-  display:flex; gap:6px;
-  padding:10px 14px 6px;
-}
-.dot{width:8px; height:8px; border-radius:50%; background:rgba(246,241,231,0.25);}
-.device-body{
-  background:var(--cream);
-  border-radius:20px;
-  padding:22px 20px 24px;
-}
+/* ============ quiz card parts (used by the deck) ============ */
 .quiz-header{
   display:flex; justify-content:space-between; align-items:center;
   font-size:0.78rem; font-weight:600; color:var(--ink-faint);
@@ -481,6 +539,52 @@ img,svg{display:block; max-width:100%;}
 .net-node.is-selected circle.dot{ fill:var(--ink); }
 .net-node.is-selected circle.ring{ opacity:1; }
 .net-node.is-selected circle.more{ opacity:0; }
+/* Your own topics */
+.net-node.is-mine circle.dot{ fill:#647344; }
+.net-node.is-mine.is-lit circle.dot{ fill:var(--accent); }
+.net-node.is-mine .net-label{ font-weight:600; fill:#4d5a33; }
+.net-node.is-adding circle.ring{ opacity:1; stroke-dasharray:3 3; }
+.net-particle{ fill:var(--accent); pointer-events:none; }
+
+/* "+" handle: springs in when you hover, focus or select a topic */
+.net-node .add{ opacity:0; pointer-events:none; transition:opacity 0.15s ease; cursor:pointer; }
+.net-node .add-bg{ fill:var(--ink); stroke:var(--cream); stroke-width:1.5; }
+.net-node .add-plus{ stroke:var(--cream); stroke-width:1.6; stroke-linecap:round; fill:none; }
+.net-node:hover .add, .net-node:focus-visible .add, .net-node.is-selected .add, .net-node.is-adding .add{ opacity:1; pointer-events:auto; }
+.net-node .add:hover .add-bg{ fill:var(--accent-dim); }
+.network-stage.is-linking .net-node .add{ display:none; }
+
+/* Inline name box */
+.network-add{
+  position:absolute; z-index:6;
+  display:flex; align-items:center; gap:4px;
+  padding:5px 5px 5px 14px;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:999px;
+  box-shadow:0 16px 32px -14px rgba(33,29,23,0.35);
+  transform-origin:50% 0;
+  animation:net-add-in 0.42s cubic-bezier(0.34,1.56,0.64,1);
+}
+.network-add[hidden]{ display:none; }
+.network-add:focus-within{ border-color:var(--ink-faint); box-shadow:0 0 0 2px var(--accent-tint), 0 16px 32px -14px rgba(33,29,23,0.35); }
+.network-add-input{
+  width:9.5rem; border:0; outline:none; background:transparent;
+  font:inherit; font-size:0.9rem; color:var(--ink);
+}
+.network-add-input::placeholder{ color:var(--ink-faint); }
+.network-add-go, .network-add-x{
+  font:inherit; font-size:0.82rem; font-weight:600; cursor:pointer;
+  border:0; border-radius:999px; padding:7px 14px;
+}
+.network-add-go{ background:var(--ink); color:var(--cream); }
+.network-add-go:hover{ background:var(--accent-dim); }
+.network-add-x{ background:transparent; color:var(--ink-faint); padding:7px 10px; font-size:1.05rem; line-height:1; }
+.network-add-x:hover{ color:var(--ink); }
+.network-add-go:focus-visible, .network-add-x:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+@keyframes net-add-in{ from{ opacity:0; transform:translateY(-6px) scale(0.82); } to{ opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce){ .network-add{ animation:none; } }
+
 .net-node:focus{ outline:none; }
 .net-node:focus-visible circle.ring{ opacity:1; stroke:var(--ink); stroke-dasharray:2 2; }
 .net-node:focus-visible circle.more{ opacity:0; }
@@ -690,8 +794,6 @@ img,svg{display:block; max-width:100%;}
 
 /* ============ responsive ============ */
 @media (max-width: 900px){
-  .hero{grid-template-columns:1fr; padding-top:64px;}
-  .hero-visual{order:-1; margin-bottom:12px;}
   .feature-row, .feature-row-rev{grid-template-columns:1fr; gap:32px;}
   .feature-row-rev .feature-copy, .feature-row-rev .feature-visual{order:initial;}
   .steps{grid-template-columns:1fr;}
@@ -702,7 +804,6 @@ img,svg{display:block; max-width:100%;}
 }
 
 @media (max-width: 560px){
-  .hero{padding:56px 20px 24px;}
   .section-head{padding:0 20px;}
   .feature-row{padding:0 20px;}
   .steps{padding:0 20px;}

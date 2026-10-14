@@ -26,26 +26,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: hero-app/package-lock.json
-
-      - name: Build hero app
-        working-directory: hero-app
-        run: |
-          npm ci
-          npm run build
-
-      - name: Assemble site
-        run: |
-          mkdir _site
-          cp index.html cookies.html privacy.html terms.html _site/
-          cp -r css js fonts _site/
-          cp -r hero-app/dist _site/hero
-
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
@@ -54,7 +34,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: .
 
       - name: Deploy to GitHub Pages
         id: deployment

@@ -20,105 +20,40 @@
 
 <div id="page">
 
-<!-- Nav -->
-<header class="nav">
-  <div class="nav-inner">
-    <a href="#top" class="brand">Recall</a>
-    <nav class="nav-links">
-      <a href="#features">Features</a>
-      <a href="#how">How it works</a>
-      <a href="hero/">Hero</a>
-      <a href="#access" class="nav-cta">Get an invite <span aria-hidden="true">&rarr;</span></a>
-    </nav>
-  </div>
-</header>
+<!-- Nav: fixed pill, sits over the dark hero and stays put while scrolling -->
+<nav class="hero-nav" aria-label="Primary">
+  <a href="#features">Features</a>
+  <a href="#how">How it works</a>
+  <a href="#network">Live demo</a>
+  <a href="#access" class="hero-nav-cta">Get an invite</a>
+</nav>
 
 <main id="top">
 
   <!-- Hero -->
-  <section class="hero">
-    <div class="hero-inner">
-      <p class="eyebrow reveal-up">Invite-only &middot; built for course cohorts</p>
-      <h1 class="hero-title">
-        <span class="line reveal-up">Group study,</span>
-        <span class="line reveal-up">minus the group</span>
-        <span class="line reveal-up">chat chaos.</span>
-      </h1>
-      <p class="hero-sub reveal-up">
-        Recall turns your cohort into quiz squads. Pull questions from your own notes,
-        run live rounds with your study group, and see what's actually sticking before the exam does.
-      </p>
-      <div class="hero-actions reveal-up">
-        <span class="btn btn-primary">Ask your tutor for an invite code</span>
-        <span class="hero-note">No public sign-up. Access is invite-only, by design.</span>
-      </div>
-    </div>
+  <section class="hero" id="hero">
+    <!-- Decorative loop. Streamed from a third-party CDN (disclosed in the privacy + cookie
+         policies); the gradient behind it is the fallback if it can't load. -->
+    <video class="hero-video" id="heroVideo" autoplay loop muted playsinline preload="auto" aria-hidden="true" tabindex="-1"
+      src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260405_170732_8a9ccda6-5cff-4628-b164-059c500a2b41.mp4"></video>
+    <div class="hero-noise" aria-hidden="true"></div>
+    <div class="hero-shade" aria-hidden="true"></div>
 
-    <div class="hero-visual reveal-scale" aria-hidden="true">
-      <div class="device device-quiz">
-        <div class="device-bar">
-          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-        </div>
-        <div class="device-body">
-          <div class="quiz-header">
-            <span class="quiz-room">ECON 201 &middot; Room 4</span>
-            <span class="quiz-timer">00:14</span>
-          </div>
-          <p class="quiz-q">Which curve shifts right when consumer income rises for a normal good?</p>
-          <div class="quiz-options">
-            <div class="quiz-opt is-correct"><span>A</span>Demand curve</div>
-            <div class="quiz-opt"><span>B</span>Supply curve</div>
-            <div class="quiz-opt"><span>C</span>Indifference curve</div>
-            <div class="quiz-opt"><span>D</span>Production curve</div>
-          </div>
-          <div class="quiz-players">
-            <div class="player"><span class="avatar" style="--c:#c1512a">M</span>Maya <b>+120</b></div>
-            <div class="player"><span class="avatar" style="--c:#7c8a5c">J</span>Jian <b>+90</b></div>
-            <div class="player"><span class="avatar" style="--c:#4c6b8a">S</span>Sam <b>+80</b></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Marquee strip -->
-  <section class="strip">
-    <div class="strip-track">
-      <span>Live quiz rounds</span><span>&middot;</span>
-      <span>Shared question banks</span><span>&middot;</span>
-      <span>Study session rooms</span><span>&middot;</span>
-      <span>Private progress tracking</span><span>&middot;</span>
-      <span>Cohort-only access</span><span>&middot;</span>
-      <span>Live quiz rounds</span><span>&middot;</span>
-      <span>Shared question banks</span><span>&middot;</span>
-      <span>Study session rooms</span><span>&middot;</span>
-      <span>Private progress tracking</span><span>&middot;</span>
-      <span>Cohort-only access</span><span>&middot;</span>
-    </div>
-  </section>
-
-  <!-- Interactive network -->
-  <section class="network" id="network">
-    <div class="section-head">
-      <p class="eyebrow reveal-up">Live demo</p>
-      <h2 class="section-title reveal-up">Every question your cohort adds makes the web stronger.</h2>
-    </div>
-    <div class="network-stage reveal-scale">
-      <div class="network-frame">
-        <svg id="networkSvg" viewBox="-320 -210 640 420" role="group" aria-label="Interactive map of your cohort's courses and topics. Tab through the topics; press Enter or Space on one to open it up and reveal the topics inside it." aria-describedby="networkHint"></svg>
-        <div class="network-zoom" role="group" aria-label="Zoom">
-          <button type="button" class="network-zoom-btn" data-zoom="in" aria-label="Zoom in"><span aria-hidden="true">+</span></button>
-          <button type="button" class="network-zoom-btn" data-zoom="out" aria-label="Zoom out"><span aria-hidden="true">&minus;</span></button>
-          <button type="button" class="network-zoom-btn network-zoom-fit" data-zoom="fit" aria-label="Fit the whole map in view">Fit</button>
-        </div>
-      </div>
-      <p class="sr-only" id="networkStatus" role="status" aria-live="polite"></p>
-      <div class="network-controls">
-        <p class="network-hint" id="networkHint">Tap a course to open it up, then keep going &mdash; most topics have more inside. Drag to move things around; pinch or Ctrl&nbsp;+&nbsp;scroll to zoom.</p>
-        <div class="network-actions">
-          <button type="button" class="network-btn" id="networkLinkMode" aria-pressed="false">Draw your own link</button>
-          <button type="button" class="network-btn" id="networkReset">Reset graph</button>
-        </div>
+    <div class="hero-content">
+      <h1 class="hero-word"><span class="w">Recall<span class="ast" aria-hidden="true">*</span></span></h1>
+      <div class="hero-side">
+        <p class="hero-eyebrow reveal-up">Invite-only &middot; built for course cohorts</p>
+        <p class="hero-sub reveal-up">
+          Group study, minus the group chat chaos. Recall turns your cohort into quiz squads:
+          pull questions from your own notes, run live rounds with your study group, and see
+          what&rsquo;s actually sticking before the exam does.
+        </p>
+        <a href="#access" class="hero-cta reveal-up">
+          Get an invite
+          <span class="hero-cta-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </span>
+        </a>
       </div>
     </div>
   </section>
@@ -164,6 +99,49 @@
           <div class="quiz-opt"><span>B</span>Melbourne</div>
           <div class="quiz-opt is-correct"><span>C</span>Canberra</div>
           <div class="quiz-opt"><span>D</span>Brisbane</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Marquee strip -->
+  <section class="strip">
+    <div class="strip-track">
+      <span>Live quiz rounds</span><span>&middot;</span>
+      <span>Shared question banks</span><span>&middot;</span>
+      <span>Study session rooms</span><span>&middot;</span>
+      <span>Private progress tracking</span><span>&middot;</span>
+      <span>Cohort-only access</span><span>&middot;</span>
+      <span>Live quiz rounds</span><span>&middot;</span>
+      <span>Shared question banks</span><span>&middot;</span>
+      <span>Study session rooms</span><span>&middot;</span>
+      <span>Private progress tracking</span><span>&middot;</span>
+      <span>Cohort-only access</span><span>&middot;</span>
+    </div>
+  </section>
+
+  <!-- Interactive network -->
+  <section class="network" id="network">
+    <div class="section-head">
+      <p class="eyebrow reveal-up">Live demo</p>
+      <h2 class="section-title reveal-up">Every question your cohort adds makes the web stronger.</h2>
+    </div>
+    <div class="network-stage reveal-scale">
+      <div class="network-frame">
+        <svg id="networkSvg" viewBox="-320 -210 640 420" role="group" aria-label="Interactive map of your cohort's courses and topics. Tab through the topics; press Enter or Space on one to open it up and reveal the topics inside it." aria-describedby="networkHint"></svg>
+        <div class="network-zoom" role="group" aria-label="Zoom">
+          <button type="button" class="network-zoom-btn" data-zoom="in" aria-label="Zoom in"><span aria-hidden="true">+</span></button>
+          <button type="button" class="network-zoom-btn" data-zoom="out" aria-label="Zoom out"><span aria-hidden="true">&minus;</span></button>
+          <button type="button" class="network-zoom-btn network-zoom-fit" data-zoom="fit" aria-label="Fit the whole map in view">Fit</button>
+        </div>
+      </div>
+      <p class="sr-only" id="networkStatus" role="status" aria-live="polite"></p>
+      <div class="network-controls">
+        <p class="network-hint" id="networkHint">Tap a course to open it up, then keep going &mdash; most topics have more inside. Add your own: use &ldquo;Add a topic&rdquo;, the + on a topic, or double-click empty space (they last for this visit only). Drag to move things around; pinch or Ctrl&nbsp;+&nbsp;scroll to zoom.</p>
+        <div class="network-actions">
+          <button type="button" class="network-btn" id="networkAdd">Add a topic</button>
+          <button type="button" class="network-btn" id="networkLinkMode" aria-pressed="false">Draw your own link</button>
+          <button type="button" class="network-btn" id="networkReset">Reset graph</button>
         </div>
       </div>
     </div>
