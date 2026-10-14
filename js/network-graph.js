@@ -11,6 +11,17 @@
 // - The old "click two dots to link them" feature stays, but behind an explicit
 //   "Draw your own link" mode, since a plain click now means "open this topic".
 //   Your own links are dashed accent lines so they never read as authored ones.
+// - You can add your own topics (the "+" on a node, N on a focused node, the "Add a
+//   topic" button, or double-click empty space) and remove them again (Delete).
+//   They are held in memory only: the privacy/cookie pages promise no browser storage.
+//
+// Motion: nodes are masses on damped springs, stepped at a fixed 1/60s on one shared
+// clock. That drives the pop-in bounce, hover squash, the elastic drag, and the
+// "shuffle" — a radial + sideways shove with a short burst of extra repulsion and
+// lower friction, so the whole map reshuffles and wobbles before it settles. Ideas
+// borrowed from alijdens.github.io/2023-09-05-graph-animation-sms (spring-mass, fixed
+// step, zero-length anchor spring) and vasturiano/force-graph (reheat on change,
+// directional particles along edges, eased fit-to-view).
 (function initNetworkGraph() {
   var svgEl = document.getElementById('networkSvg');
   if (!svgEl) return;
@@ -44,9 +55,9 @@
     (d.parents || []).forEach(function (p) { if (CHILDREN[p]) CHILDREN[p].push(d.id); });
   });
 
-  var SIZE = { root: 9, course: 7, topic: 5, leaf: 3.5 };
+  var SIZE = { root: 9, course: 7, topic: 5, leaf: 3.5, mine: 4.6 };
   var LINK_DIST = { root: 115, course: 78, topic: 62, leaf: 62 }; // keyed by the parent's kind
-  var CHARGE = { root: -320, course: -360, topic: -210, leaf: -150 };
+  var CHARGE = { root: -320, course: -360, topic: -210, leaf: -150, mine: -170 };
   var MIN_K = 0.3, MAX_K = 2.4, FIT_MAX_K = 1.35;
 
   // ---------- live state ----------
@@ -71,6 +82,7 @@
   var svg = d3.select(svgEl);
   var viewport = svg.append('g').attr('class', 'net-viewport');
   var edgeLayer = viewport.append('g').attr('class', 'net-edges').node();
+  var particleLayer = viewport.append('g').attr('class', 'net-particles').node();
   var nodeLayer = viewport.append('g').attr('class', 'net-nodes').node();
 
   function el(tag, attrs, parent) {
@@ -89,6 +101,12 @@
     el('circle', { 'class': 'more', r: r + 4 }, body);
     el('circle', { 'class': 'ring', r: r + 4 }, body);
     el('circle', { 'class': 'dot', r: r }, body);
+    // "+" handle: adds a topic under this one. Sits inside the hit area so the pointer
+    // can reach it without leaving the node.
+    var off = r + 3;
+    var add = el('g', { 'class': 'add', transform: 'translate(' + off + ',' + (-off) + ')', 'aria-hidden': 'true' }, body);
+    el('circle', { 'class': 'add-bg', r: 6.5 }, add);
+    el('path', { 'class': 'add-plus', d: 'M-3 0H3M0 -3V3' }, add);
     var text = el('text', { 'class': 'net-label', y: r + 3, dy: '0.85em', 'text-anchor': 'middle' }, body);
     text.textContent = n.data.label;
 
@@ -109,6 +127,10 @@
   }
 
   // ---------- simulation ----------
+  var BASE_DECAY = 0.36;
+  var boost = 1;   // temporary extra repulsion after a shove (decays back to 1)
+  var loose = 0;   // temporary drop in friction after a shove (decays back to 0)
+  function chargeFn(n) { return (CHARGE[n.data.kind] || -150) * boost; }
   var degree = {};
   var sim = d3.forceSimulation()
     .force('link', d3.forceLink()
@@ -118,7 +140,7 @@
         return 0.8 / Math.min(degree[l.source.id] || 1, degree[l.target.id] || 1);
       }))
     .force('charge', d3.forceManyBody()
-      .strength(function (n) { return CHARGE[n.data.kind] || -150; })
+      .strength(chargeFn)
       .distanceMax(460))
     .force('collide', d3.forceCollide()
       .radius(function (n) { return sizeOf(n) + 12; })
@@ -127,13 +149,13 @@
     .force('x', d3.forceX(0).strength(0.03))
     .force('y', d3.forceY(0).strength(0.055))
     .alphaDecay(0.03)
-    .velocityDecay(0.36)
+    .velocityDecay(BASE_DECAY)
     .on('tick', render)
     .stop();
 
   // Circles can't model wide text labels, so nodes also push apart when the
   // box around "dot + label underneath" overlaps a neighbour's box.
-  var LABEL_PX = { root: 12.5, course: 12, topic: 10.5, leaf: 10.5 };
+  var LABEL_PX = { root: 12.5, course: 12, topic: 10.5, leaf: 10.5, mine: 10.5 };
   var labelScale = 1; // the --u label counter-scale, kept in sync by applyTransform()
   function labelBox(n) {
     var r = sizeOf(n);
@@ -214,6 +236,7 @@
       nodes[i].el.setAttribute('transform', 'translate(' + r2(nodes[i].x) + ',' + r2(nodes[i].y) + ')');
     }
     links.forEach(renderLink);
+    placeAddForm();
   }
 
   // ---------- adding things ----------
@@ -257,22 +280,7 @@
 
   function animateIn(newNodes, newLinks) {
     if (reducedMotion()) return;
-    newNodes.forEach(function (n, i) {
-      var s = { v: 0.15, o: 0 };
-      n.body.setAttribute('transform', 'scale(0.15)');
-      n.body.style.opacity = '0';
-      gsap.to(s, {
-        v: 1, o: 1, duration: 0.55, delay: 0.08 + i * 0.06, ease: EASE,
-        onUpdate: function () {
-          n.body.setAttribute('transform', 'scale(' + s.v + ')');
-          n.body.style.opacity = s.o;
-        },
-        onComplete: function () {
-          n.body.removeAttribute('transform');
-          n.body.style.opacity = '';
-        }
-      });
-    });
+    newNodes.forEach(function (n, i) { popIn(n, 0.08 + i * 0.06); });
     newLinks.forEach(function (l, i) {
       l.progress = 0;
       renderLink(l);
@@ -280,23 +288,214 @@
         progress: 1, duration: 0.5, delay: i * 0.06, ease: EASE,
         onUpdate: function () { renderLink(l); }
       });
+      emit(l.source, l.target, 0.12 + i * 0.06);
     });
   }
 
-  function pulse(n) {
-    if (reducedMotion()) return;
-    var s = { v: 1 };
-    gsap.to(s, {
-      v: 1.35, duration: 0.18, yoyo: true, repeat: 1, ease: 'power2.out',
-      onUpdate: function () { n.body.setAttribute('transform', 'scale(' + s.v + ')'); },
-      onComplete: function () { n.body.removeAttribute('transform'); }
-    });
-  }
+  function pulse(n) { bump(n, 7); }
 
   function glowPulse(n) {
     if (reducedMotion() || n.data.kind !== 'course') return;
     var glow = n.el.querySelector('.glow');
     gsap.to(glow, { opacity: 0.4, duration: 2.2 + (nodes.indexOf(n) % 3), repeat: -1, yoyo: true, ease: 'sine.inOut' });
+  }
+
+  // ---------- spring motion ----------
+  // One shared loop, stepped at a fixed 1/60s (so it feels the same at 60 and 144Hz)
+  // with a stall guard: if the tab slept, drop the time instead of fast-forwarding.
+  var STEP = 1000 / 60;
+  var SPRING_K = 210, SPRING_C = 11.6;  // zeta ~0.4: a lively overshoot that settles in ~0.7s
+  var DRAG_K = 320, DRAG_C = 17;        // zeta ~0.47: the held node trails the pointer, then settles
+  var MAX_FLING = 14;                   // px per sim tick, so a hard throw can't leave the map
+  var loopOn = false, lastFrame = 0, acc = 0;
+  var dragState = null;                 // the dragged node's anchor spring
+  var particles = [];
+  var pending = [];                     // delayed callbacks on the same clock: { t, fn }
+
+  function springOf(n) {
+    return n.sc || (n.sc = { x: 1, v: 0, t: 1, wait: 0, pop: false, rm: false });
+  }
+
+  function ensureLoop() {
+    if (loopOn || reducedMotion()) return;
+    loopOn = true;
+    lastFrame = performance.now();
+    acc = 0;
+    requestAnimationFrame(frame);
+  }
+
+  function frame(now) {
+    var elapsed = now - lastFrame;
+    lastFrame = now;
+    if (elapsed > 3000) acc = 0;
+    else acc = Math.min(acc + elapsed, STEP * 6);
+    var keep = true;
+    while (acc >= STEP) { keep = step(STEP / 1000); acc -= STEP; }
+    if (dragState) render(); // the sim may be cooling; keep the held node moving
+    if (keep) requestAnimationFrame(frame); else loopOn = false;
+  }
+
+  function applyLooseness() {
+    sim.velocityDecay(BASE_DECAY - 0.16 * loose);
+    sim.force('charge').strength(chargeFn);
+  }
+
+  function paint(n) {
+    var s = n.sc;
+    if (s.x === 1 && s.v === 0 && !s.pop) {
+      n.body.removeAttribute('transform');
+      n.body.style.opacity = '';
+      return;
+    }
+    n.body.setAttribute('transform', 'scale(' + Math.max(0.001, s.x).toFixed(3) + ')');
+    n.body.style.opacity = s.pop ? Math.max(0, Math.min(1, (s.x - 0.15) / 0.45)).toFixed(2) : '';
+  }
+
+  function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+  function step(dt) {
+    var active = false, i, finished = null;
+
+    for (i = pending.length - 1; i >= 0; i--) {
+      pending[i].t -= dt;
+      if (pending[i].t <= 0) pending.splice(i, 1)[0].fn();
+    }
+    if (pending.length) active = true;
+
+    // Node size springs: pop-in, hover squash, bumps, shrink-out.
+    for (i = 0; i < nodes.length; i++) {
+      var n = nodes[i], sp = n.sc;
+      if (!sp) continue;
+      if (sp.wait > 0) { sp.wait -= dt; active = true; continue; }
+      var c = sp.rm ? 2 * Math.sqrt(SPRING_K) : SPRING_C; // critically damped when leaving: no flip through zero
+      sp.v += (-SPRING_K * (sp.x - sp.t) - c * sp.v) * dt;
+      sp.x += sp.v * dt;
+      if (sp.rm && sp.x < 0.05) { (finished = finished || []).push(n); continue; }
+      if (Math.abs(sp.x - sp.t) < 0.002 && Math.abs(sp.v) < 0.02) {
+        sp.x = sp.t; sp.v = 0;
+        if (sp.t === 1) sp.pop = false;
+      } else {
+        active = true;
+      }
+      paint(n);
+    }
+
+    // The held node: a zero-length spring to the pointer (the "anchor" from the spring-mass
+    // post). Its neighbours feel it through their own link springs, so the pull ripples.
+    if (dragState) {
+      var d = dragState;
+      d.vx += (-DRAG_K * (d.x - d.tx) - DRAG_C * d.vx) * dt;
+      d.vy += (-DRAG_K * (d.y - d.ty) - DRAG_C * d.vy) * dt;
+      d.x += d.vx * dt; d.y += d.vy * dt;
+      d.n.fx = d.x; d.n.fy = d.y;
+      var home = Math.abs(d.x - d.tx) + Math.abs(d.y - d.ty) < 0.4 && Math.abs(d.vx) + Math.abs(d.vy) < 2;
+      if (d.releasing && home) { d.n.fx = d.tx; d.n.fy = d.ty; dragState = null; }
+      else active = true;
+    }
+
+    // Pulses travelling along edges.
+    for (i = particles.length - 1; i >= 0; i--) {
+      var p = particles[i];
+      if (p.wait > 0) { p.wait -= dt; active = true; continue; }
+      p.t += dt / 0.7;
+      if (p.t >= 1) { particleLayer.removeChild(p.el); particles.splice(i, 1); continue; }
+      active = true;
+      var e = easeInOutCubic(p.t);
+      p.el.setAttribute('cx', r2(p.from.x + (p.to.x - p.from.x) * e));
+      p.el.setAttribute('cy', r2(p.from.y + (p.to.y - p.from.y) * e));
+      p.el.setAttribute('opacity', p.t < 0.15 ? p.t / 0.15 : p.t > 0.85 ? (1 - p.t) / 0.15 : 1);
+    }
+
+    // The shove wears off: repulsion and friction ease back to normal.
+    if (boost > 1 || loose > 0) {
+      boost = 1 + (boost - 1) * Math.exp(-dt / 0.4);
+      loose *= Math.exp(-dt / 0.6);
+      if (boost < 1.002) boost = 1;
+      if (loose < 0.01) loose = 0;
+      applyLooseness();
+      active = true;
+    }
+
+    if (finished) finishRemove(finished);
+    return active;
+  }
+
+  // A burst of life: the new node (or the one you opened) springs out from nothing.
+  function popIn(n, delay) {
+    if (reducedMotion()) return;
+    var sp = springOf(n);
+    sp.x = 0.15; sp.v = 0; sp.t = 1; sp.wait = delay || 0; sp.pop = true;
+    n.body.setAttribute('transform', 'scale(0.15)');
+    n.body.style.opacity = '0';
+    ensureLoop();
+  }
+
+  function bump(n, v) {
+    if (reducedMotion() || !n) return;
+    springOf(n).v += v;
+    ensureLoop();
+  }
+
+  function hoverScale(n, on) {
+    if (reducedMotion() || !n || dragging) return;
+    var sp = springOf(n);
+    if (sp.rm) return;
+    sp.t = on ? 1.16 : 1;
+    ensureLoop();
+  }
+
+  // The shuffle. Everything near the origin gets a radial shove plus a sideways swirl
+  // (so neighbours trade places rather than just backing away), repulsion spikes and
+  // friction drops for a moment, and the map wobbles back into a new arrangement.
+  function shuffle(origin, strength) {
+    if (reducedMotion()) return;
+    var sign = Math.random() < 0.5 ? -1 : 1;
+    nodes.forEach(function (m) {
+      if (m === origin || m.id === ROOT_ID) return;
+      var dx = m.x - origin.x, dy = m.y - origin.y;
+      var d = Math.sqrt(dx * dx + dy * dy) || 1;
+      var f = strength / (1 + d / 70);
+      m.vx += (dx / d - sign * dy / d * 0.45) * f;
+      m.vy += (dy / d + sign * dx / d * 0.45) * f;
+    });
+    boost = Math.max(boost, 1 + strength * 0.14);
+    loose = 1;
+    applyLooseness();
+    ensureLoop();
+  }
+
+  // A wave through the graph: each hop out from the origin gets bumped a beat later.
+  function ripple(origin, amount) {
+    if (reducedMotion()) return;
+    var hop = {}, queue = [origin];
+    hop[origin.id] = 0;
+    while (queue.length) {
+      var cur = queue.shift();
+      if (hop[cur.id] >= 4) continue;
+      neighbors(cur.id).forEach(function (m) {
+        if (hop[m.id] === undefined) { hop[m.id] = hop[cur.id] + 1; queue.push(m); }
+      });
+    }
+    nodes.forEach(function (m) {
+      var h = hop[m.id];
+      if (!h) return;
+      pending.push({ t: h * 0.07, fn: function () { bump(m, amount / (1 + h * 0.6)); } });
+    });
+    ensureLoop();
+  }
+
+  function emit(from, to, delay) {
+    if (reducedMotion()) return;
+    var dot = el('circle', { 'class': 'net-particle', r: 2.8, opacity: 0 }, particleLayer);
+    particles.push({ from: from, to: to, t: 0, wait: delay || 0, el: dot });
+    ensureLoop();
+  }
+
+  function clearMotion() {
+    pending = []; particles = []; dragState = null;
+    particleLayer.textContent = '';
+    boost = 1; loose = 0;
+    applyLooseness();
   }
 
   // ---------- open a topic ----------
@@ -323,6 +522,7 @@
     animateIn(newNodes, newLinks);
     newNodes.forEach(glowPulse);
     reheat(0.9);
+    if (newNodes.length) { shuffle(parent, 2.4); bump(parent, 5); ripple(parent, 4); }
     refreshAll();
 
     var msg = [];
@@ -348,6 +548,199 @@
     reheat(0.2);
     var nb = neighbors(id).map(label);
     announce(n.data.label + (nb.length ? ' connects to ' + listJoin(nb) + '.' : ' has no connections yet.'));
+  }
+
+  // ---------- your own topics ----------
+  var MAX_USER = 40, LABEL_MAX = 24;
+  var userIds = [], userSeq = 0;
+  var lastActive = null;   // the topic "Add a topic" attaches to
+  var addTarget = null;    // { parent: node|null, x, y, kb } while the name box is open
+  var frameEl = svgEl.parentNode;
+
+  var addForm = document.createElement('form');
+  addForm.className = 'network-add';
+  addForm.hidden = true;
+  addForm.setAttribute('autocomplete', 'off');
+  var addInput = document.createElement('input');
+  addInput.type = 'text';
+  addInput.className = 'network-add-input';
+  addInput.maxLength = LABEL_MAX;
+  addInput.placeholder = 'Topic name';
+  var addGo = document.createElement('button');
+  addGo.type = 'submit';
+  addGo.className = 'network-add-go';
+  addGo.textContent = 'Add';
+  var addX = document.createElement('button');
+  addX.type = 'button';
+  addX.className = 'network-add-x';
+  addX.setAttribute('aria-label', 'Cancel');
+  addX.textContent = '×';
+  addForm.appendChild(addInput);
+  addForm.appendChild(addGo);
+  addForm.appendChild(addX);
+  frameEl.appendChild(addForm);
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  // Keep the name box under the node it belongs to, even while the map is moving.
+  function placeAddForm() {
+    if (!addTarget || addForm.hidden) return;
+    var t = lastTransform;
+    var gx = addTarget.parent ? addTarget.parent.x : addTarget.x;
+    var gy = addTarget.parent ? addTarget.parent.y : addTarget.y;
+    var below = (addTarget.parent ? sizeOf(addTarget.parent) * t.k + 34 : 16);
+    var fw = addForm.offsetWidth, fh = addForm.offsetHeight;
+    addForm.style.left = Math.round(clamp(W / 2 + t.x + gx * t.k - fw / 2, 8, Math.max(8, W - fw - 8))) + 'px';
+    addForm.style.top = Math.round(clamp(H / 2 + t.y + gy * t.k + below, 8, Math.max(8, H - fh - 8))) + 'px';
+  }
+
+  function startAdd(parentId, pos, viaKeyboard) {
+    if (linkMode) return;
+    if (userIds.length >= MAX_USER) {
+      announce('That is the most topics you can add in one visit. Reset the graph to start again.');
+      return;
+    }
+    closeAdd(false);
+    var parent = parentId && nodeById[parentId] ? nodeById[parentId] : null;
+    addTarget = { parent: parent, x: pos ? pos.x : 0, y: pos ? pos.y : 0, kb: !!viaKeyboard };
+    if (parent) parent.el.classList.add('is-adding');
+    addInput.value = '';
+    addInput.setAttribute('aria-label', parent ? 'Name a new topic under ' + parent.data.label : 'Name a new topic');
+    addForm.hidden = false;
+    placeAddForm();
+    addInput.focus({ preventScroll: true });
+    announce(parent
+      ? 'Type a name for a new topic under ' + parent.data.label + ', then press Enter. Escape cancels.'
+      : 'Type a name for a new topic, then press Enter. Escape cancels.');
+  }
+
+  function closeAdd(restoreFocus) {
+    var t = addTarget;
+    addTarget = null;
+    addForm.hidden = true;
+    if (t && t.parent && t.parent.el) {
+      t.parent.el.classList.remove('is-adding');
+      if (restoreFocus) t.parent.el.focus({ preventScroll: true });
+    }
+  }
+
+  function commitAdd() {
+    if (!addTarget) return;
+    var label = addInput.value.replace(/\s+/g, ' ').trim();
+    var target = addTarget;
+    closeAdd(false);
+    if (!label) { if (target.kb && target.parent) target.parent.el.focus({ preventScroll: true }); return; }
+    createUserNode(label, target);
+  }
+
+  function createUserNode(label, target) {
+    var from = target.parent;
+    var id = 'user-' + (++userSeq);
+    DATA[id] = { id: id, label: label, kind: 'mine', parents: from ? [from.id] : [] };
+    CHILDREN[id] = [];
+    userIds.push(id);
+
+    var n, l = null;
+    if (from) {
+      n = addNode(id, from, Math.random(), 1); // a random bearing, so repeated adds fan out
+      n.userParent = from.id;
+      l = addLink(from, n, false);
+    } else {
+      n = addNode(id, null, 0, 1);
+      n.x = target.x; n.y = target.y;
+    }
+    n.mine = true;
+    syncSim();
+
+    if (!reducedMotion()) {
+      popIn(n, 0.02);
+      if (l) { l.progress = 0; renderLink(l); gsap.to(l, { progress: 1, duration: 0.45, ease: EASE, onUpdate: function () { renderLink(l); } }); }
+    }
+    refit();
+    reheat(1);
+    if (!reducedMotion()) {
+      var origin = from || n;
+      shuffle(origin, 3.6);
+      if (from) {
+        // Launch it away from its parent: the link spring then reels it back in, which is the bounce.
+        var dx = n.x - from.x, dy = n.y - from.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+        n.vx += dx / d * 6; n.vy += dy / d * 6;
+        emit(from, n, 0.05);
+        var k = 0;
+        links.forEach(function (m) {
+          if (m === l) return;
+          if (m.source === from) emit(from, m.target, 0.14 + 0.05 * k++);
+          else if (m.target === from) emit(from, m.source, 0.14 + 0.05 * k++);
+        });
+        bump(from, 6);
+      }
+      ripple(origin, 5);
+    }
+    refreshAll();
+    announce('Added ' + label + (from ? ' under ' + from.data.label : '') + '. Press Delete on it to remove it.');
+    if (target.kb) n.el.focus({ preventScroll: true });
+  }
+
+  // Remove one of your own topics (and anything you hung off it).
+  function removeUser(id) {
+    var n = nodeById[id];
+    if (!n || !n.mine || n.dying) return;
+    var doomed = [n], i;
+    for (i = 0; i < doomed.length; i++) {
+      for (var j = 0; j < nodes.length; j++) {
+        if (nodes[j].userParent === doomed[i].id && doomed.indexOf(nodes[j]) < 0) doomed.push(nodes[j]);
+      }
+    }
+    var parentEl = n.userParent && nodeById[n.userParent] ? nodeById[n.userParent].el : null;
+    var name = n.data.label;
+    doomed.forEach(function (m, k) {
+      m.dying = true;
+      if (reducedMotion()) return;
+      var sp = springOf(m);
+      sp.rm = true; sp.v = 4; sp.t = 0; sp.wait = k * 0.05;
+    });
+    if (reducedMotion()) finishRemove(doomed); else ensureLoop();
+    if (parentEl) parentEl.focus({ preventScroll: true });
+    announce('Removed ' + name + (doomed.length > 1 ? ' and ' + plural(doomed.length - 1, 'topic') + ' under it' : '') + '.');
+  }
+
+  function finishRemove(list) {
+    var gone = {};
+    list.forEach(function (m) { gone[m.id] = true; });
+    links = links.filter(function (l) {
+      if (!gone[l.source.id] && !gone[l.target.id]) return true;
+      if (l.el.parentNode) l.el.parentNode.removeChild(l.el);
+      delete linkByKey[l.key];
+      return false;
+    });
+    nodes = nodes.filter(function (m) { return !gone[m.id]; });
+    particles = particles.filter(function (p) {
+      var keep = !gone[p.from.id] && !gone[p.to.id];
+      if (!keep && p.el.parentNode) p.el.parentNode.removeChild(p.el);
+      return keep;
+    });
+    list.forEach(function (m) {
+      if (m.el.parentNode) m.el.parentNode.removeChild(m.el);
+      delete nodeById[m.id];
+      delete DATA[m.id];
+      delete CHILDREN[m.id];
+      userIds.splice(userIds.indexOf(m.id), 1);
+      if (selected === m.id) selected = null;
+      if (hoverId === m.id) hoverId = null;
+      if (lastActive === m.id) lastActive = null;
+    });
+    syncSim();
+    clearHighlight();
+    refit();
+    reheat(0.7);
+    if (!reducedMotion()) { boost = Math.max(boost, 1.3); loose = 1; applyLooseness(); ensureLoop(); }
+    refreshAll();
+  }
+
+  // Graph coordinates under a screen point.
+  function toGraph(clientX, clientY) {
+    var r = svgEl.getBoundingClientRect(), t = lastTransform;
+    return { x: (clientX - r.left - W / 2 - t.x) / t.k, y: (clientY - r.top - H / 2 - t.y) / t.k };
   }
 
   // ---------- your own links ----------
@@ -454,6 +847,7 @@
   function describe(n) {
     var parts = [n.data.label + (n.data.kind === 'course' ? ' course' : '')];
     var nb = neighbors(n.id).map(label);
+    if (n.mine) parts[0] = n.data.label + ', your topic';
     if (nb.length) parts.push('Connected to ' + listJoin(nb));
     if (linkMode) {
       if (selected === n.id) parts.push('Selected. Press Enter to cancel the link');
@@ -465,6 +859,7 @@
       if (pending) parts.push('Press Enter to reveal ' + plural(pending, 'more topic'));
       else parts.push('Press Enter to link it to ' + plural(onMap, 'topic') + ' already on the map');
     }
+    if (!linkMode) parts.push('Press N to add a topic under it' + (n.mine ? ', or Delete to remove it' : ''));
     return parts.join('. ') + '.';
   }
 
@@ -517,6 +912,7 @@
     labelScale = Math.round(u * 20) / 20; // coarse steps so boxes aren't rebuilt every frame
     svgEl.style.setProperty('--u', u.toFixed(3));
     nodes.forEach(function (n) { n.hit.setAttribute('r', r2(Math.max(sizeOf(n) + 8, 15) * u)); });
+    placeAddForm();
   }
 
   function fitTransform() {
@@ -581,18 +977,41 @@
   }
 
   // ---------- drag ----------
+  // The node you hold is pinned to a spring that chases the pointer (see step()), so it
+  // trails, overshoots a touch, and when you let go it keeps its momentum. The root
+  // isn't free to roam: it snaps back to the centre on a spring.
   var drag = d3.drag()
     .clickDistance(5)
     .on('start', function (ev, n) {
       dragging = true;
       if (!ev.active) sim.alphaTarget(0.25).restart();
       n.fx = n.x; n.fy = n.y;
+      if (reducedMotion()) return;
+      dragState = { n: n, x: n.x, y: n.y, vx: 0, vy: 0, tx: n.x, ty: n.y, releasing: false };
+      var sp = springOf(n);
+      sp.t = 1.22; // lift
+      ensureLoop();
     })
-    .on('drag', function (ev, n) { n.fx = ev.x; n.fy = ev.y; })
+    .on('drag', function (ev, n) {
+      if (dragState && dragState.n === n) { dragState.tx = ev.x; dragState.ty = ev.y; }
+      else { n.fx = ev.x; n.fy = ev.y; }
+    })
     .on('end', function (ev, n) {
       dragging = false;
       if (!ev.active) sim.alphaTarget(0);
-      if (n.id !== ROOT_ID) { n.fx = null; n.fy = null; }
+      if (n.sc) { n.sc.t = 1; ensureLoop(); }
+      if (dragState && dragState.n === n) {
+        if (n.id === ROOT_ID) {
+          dragState.tx = 0; dragState.ty = 0; dragState.releasing = true;
+        } else {
+          var sx = dragState.vx / 60, sy = dragState.vy / 60;
+          var sp = Math.sqrt(sx * sx + sy * sy);
+          if (sp > MAX_FLING) { sx *= MAX_FLING / sp; sy *= MAX_FLING / sp; }
+          n.fx = null; n.fy = null;
+          n.vx = sx; n.vy = sy;
+          dragState = null;
+        }
+      } else if (n.id !== ROOT_ID) { n.fx = null; n.fy = null; }
       else { n.fx = 0; n.fy = 0; }
       startFitLoop();
     });
@@ -606,6 +1025,8 @@
   nodeLayer.addEventListener('pointerover', function (ev) {
     var id = nodeFromEvent(ev);
     if (id === null) return;
+    var from = ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest('.net-node');
+    if (!from || from.getAttribute('data-id') !== id) hoverScale(nodeById[id], true);
     hoverId = id;
     if (selected === null) highlight(id);
   });
@@ -614,6 +1035,7 @@
     if (id === null) return;
     var to = ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest('.net-node');
     if (to && to.getAttribute('data-id') === id) return;
+    hoverScale(nodeById[id], false);
     hoverId = null;
     restoreHighlight();
   });
@@ -621,6 +1043,7 @@
     var id = nodeFromEvent(ev);
     if (id === null) return;
     hoverId = id;
+    lastActive = id;
     if (selected === null) highlight(id);
   });
   nodeLayer.addEventListener('focusout', function (ev) {
@@ -631,15 +1054,52 @@
   nodeLayer.addEventListener('click', function (ev) {
     var id = nodeFromEvent(ev);
     if (id === null) return;
+    lastActive = id;
+    // The "+" handle adds a topic instead of opening this one.
+    if (ev.target.closest && ev.target.closest('.add')) { startAdd(id, null, ev.detail === 0); return; }
     // detail === 0 means the click came from the keyboard (or assistive tech).
     activate(id, ev.detail === 0);
   });
   nodeLayer.addEventListener('keydown', function (ev) {
-    if (ev.key !== 'Enter' && ev.key !== ' ' && ev.key !== 'Spacebar') return;
     var id = nodeFromEvent(ev);
     if (id === null) return;
+    if (!ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+      if (ev.key === 'n' || ev.key === 'N' || ev.key === '+') { ev.preventDefault(); startAdd(id, null, true); return; }
+      if ((ev.key === 'Delete' || ev.key === 'Backspace') && nodeById[id] && nodeById[id].mine) { ev.preventDefault(); removeUser(id); return; }
+    }
+    if (ev.key !== 'Enter' && ev.key !== ' ' && ev.key !== 'Spacebar') return;
     ev.preventDefault();
     activate(id, true);
+  });
+
+  // Name box: Enter adds, Escape cancels, clicking away keeps what you typed.
+  addForm.addEventListener('submit', function (ev) { ev.preventDefault(); commitAdd(); });
+  addForm.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape') { ev.stopPropagation(); closeAdd(true); }
+  });
+  addX.addEventListener('click', function () { closeAdd(true); });
+  addForm.addEventListener('focusout', function () {
+    setTimeout(function () { if (addTarget && !addForm.contains(document.activeElement)) commitAdd(); }, 0);
+  });
+
+  // Double-click (or double-tap) on empty space drops a free topic there.
+  var downAt = null, lastTap = null;
+  function isBackground(t) { return !(t.closest && t.closest('.net-node')); }
+  svgEl.addEventListener('pointerdown', function (ev) {
+    downAt = isBackground(ev.target) && ev.isPrimary ? { x: ev.clientX, y: ev.clientY } : null;
+  });
+  svgEl.addEventListener('pointerup', function (ev) {
+    if (!downAt) return;
+    var moved = Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y) > 6;
+    downAt = null;
+    if (moved || linkMode) { lastTap = null; return; }
+    var now = performance.now();
+    if (lastTap && now - lastTap.t < 380 && Math.hypot(ev.clientX - lastTap.x, ev.clientY - lastTap.y) < 28) {
+      lastTap = null;
+      startAdd(null, toGraph(ev.clientX, ev.clientY), false);
+    } else {
+      lastTap = { t: now, x: ev.clientX, y: ev.clientY };
+    }
   });
   svgEl.addEventListener('keydown', function (ev) {
     if (ev.key !== 'Escape' || !linkMode) return;
@@ -647,6 +1107,10 @@
     else setLinkMode(false);
   });
 
+  var addBtn = document.getElementById('networkAdd');
+  if (addBtn) addBtn.addEventListener('click', function (ev) {
+    startAdd(lastActive && nodeById[lastActive] ? lastActive : ROOT_ID, null, ev.detail === 0);
+  });
   if (linkBtn) linkBtn.addEventListener('click', function () { setLinkMode(!linkMode); });
   if (resetBtn) resetBtn.addEventListener('click', function () { reset(true); });
 
@@ -676,6 +1140,10 @@
       nodes.forEach(function (n) { gsap.killTweensOf(n.el.querySelector('.glow')); });
     }
     sim.stop();
+    closeAdd(false);
+    clearMotion();
+    userIds.forEach(function (id) { delete DATA[id]; delete CHILDREN[id]; });
+    userIds = []; lastActive = null;
     edgeLayer.textContent = '';
     nodeLayer.textContent = '';
     nodes = []; nodeById = {}; links = []; linkByKey = {}; expanded = {};
