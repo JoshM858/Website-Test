@@ -32,10 +32,13 @@
 
   <!-- Hero -->
   <section class="hero" id="hero">
-    <!-- Decorative loop. Streamed from a third-party CDN (disclosed in the privacy + cookie
-         policies); the gradient behind it is the fallback if it can't load. -->
+    <!-- Decorative loop, hosted with the site. The poster is the same scene, so there is always a
+         picture even if autoplay is blocked or the clip hasn't loaded. -->
     <video class="hero-video" id="heroVideo" autoplay loop muted playsinline preload="auto" aria-hidden="true" tabindex="-1"
-      src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260405_170732_8a9ccda6-5cff-4628-b164-059c500a2b41.mp4"></video>
+      poster="media/hero-poster.jpg">
+      <source src="media/hero.mp4" type="video/mp4">
+      <source src="media/hero.webm" type="video/webm">
+    </video>
     <div class="hero-noise" aria-hidden="true"></div>
     <div class="hero-shade" aria-hidden="true"></div>
 

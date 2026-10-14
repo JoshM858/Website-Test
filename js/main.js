@@ -74,13 +74,31 @@
     }
   }
 
-  // Hero background video: fade in once it's actually playing; hold still for reduced motion.
+  // Hero background video. It's always visible (the poster frame shows until it plays), so
+  // there's no "ready" state to miss. Autoplay can be refused (low-power mode, data saver), so
+  // retry on the first interaction; reduced motion keeps it paused on the poster.
   var heroVideo = document.getElementById('heroVideo');
   if (heroVideo) {
     var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduce) { heroVideo.removeAttribute('autoplay'); heroVideo.pause(); }
-    heroVideo.addEventListener('loadeddata', function () { heroVideo.classList.add('is-ready'); if (reduce) heroVideo.currentTime = 0; });
-    heroVideo.addEventListener('error', function () { heroVideo.style.display = 'none'; });
+    if (reduce) {
+      heroVideo.removeAttribute('autoplay');
+      heroVideo.pause();
+    } else {
+      var tryPlay = function () {
+        var p = heroVideo.play();
+        if (p && p.catch) p.catch(function () {});
+      };
+      tryPlay();
+      ['pointerdown', 'keydown', 'touchstart', 'scroll'].forEach(function (evt) {
+        window.addEventListener(evt, function once() {
+          window.removeEventListener(evt, once);
+          if (heroVideo.paused) tryPlay();
+        }, { passive: true });
+      });
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden && heroVideo.paused) tryPlay();
+      });
+    }
   }
 
   if (!hasGSAP) return;
